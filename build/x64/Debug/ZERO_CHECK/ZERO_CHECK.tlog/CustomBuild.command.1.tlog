@@ -1,0 +1,10 @@
+^C:\USERS\CODEZZ-OPS\PROJECTS\ESHARP\BUILD\CMAKEFILES\C49CCF50A273BEC8A1CE6F1AF057204F\GENERATE.STAMP.RULE
+setlocal
+C:\Users\Codezz-Ops\scoop\apps\cmake\current\bin\cmake.exe -SC:/Users/Codezz-Ops/Projects/ESharp -BC:/Users/Codezz-Ops/Projects/ESharp/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Codezz-Ops/Projects/ESharp/build/ESharp.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

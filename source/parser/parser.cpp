@@ -166,7 +166,7 @@ ASTPtr Parser::parseFactor() {
 }
 
 ASTPtr Parser::parsePrimary() {
-    if (check(TokenType::Interger)) {
+    if (check(TokenType::Integer)) {
         std::string numText = current.lexeme;
         advance();
         return std::make_shared<IntExpr>(std::stoi(numText));

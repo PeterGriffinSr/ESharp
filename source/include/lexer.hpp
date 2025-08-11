@@ -1,14 +1,16 @@
 #pragma once
+#include "error.hpp"
 #include <string>
-#include <cctype>
-#include <vector>
-#include <unordered_map>
 #include <stdexcept>
+#include <unordered_map>
 
 enum class TokenType {
     Fn, Let, Return, If, Else, Print,
-    Identifier, Interger, String,
-    Colon, Arrow, Eq, Leq, Plus, Minus, Star, Slash,
+    Identifier, Integer, Float, String,
+    Colon, Arrow, Eq, EqEq, Neq, Leq, Geq,
+    Plus, Minus, Star, Slash, Bang,
+    PlusAssign, MinusAssign, StarAssign, SlashAssign,
+    Less, Greater,
     LParen, RParen, LBrace, RBrace, Semi, Comma,
     Eof
 };
@@ -16,6 +18,8 @@ enum class TokenType {
 struct Token {
     TokenType type;
     std::string lexeme;
+    int line;
+    int col;
 };
 
 class Lexer {
@@ -29,13 +33,19 @@ private:
     std::string source;
     size_t pos = 0;
     size_t length;
-    Token current;
+    int line = 1;
+    int col = 1;
 
-    char peek() const;
+    char peek(size_t offset = 0) const;
     char advance();
     bool match(char expected);
-    void skipWhitespace();
+
+    void skipWhitespaceAndComments();
+
     Token identifierOrKeyword();
     Token number();
     Token string();
+
+    LexerError error(const std::string &msg) const;
+    std::string getCurrentLine() const;
 };

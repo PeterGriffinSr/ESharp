@@ -8,5 +8,5 @@ fn fact(n: int) -> int {
 
 fn main() -> void {
     let num: int = 5;
-    let fact: int = fact(num);
+    let fact: int = fact(num);~
 }
