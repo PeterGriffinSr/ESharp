@@ -6,7 +6,8 @@
 
 enum class TokenType {
     Fn, Let, Return, If, Else, Print,
-    Identifier, Integer, Float, String,
+    Identifier, Integer, Float, String, Char, Bool,
+    IntType, FloatType, StringType, CharType, BoolType, VoidType,
     Colon, Arrow, Eq, EqEq, Neq, Leq, Geq,
     Plus, Minus, Star, Slash, Bang,
     PlusAssign, MinusAssign, StarAssign, SlashAssign,
@@ -45,6 +46,7 @@ private:
     Token identifierOrKeyword();
     Token number();
     Token string();
+    Token _char();
 
     LexerError error(const std::string &msg) const;
     std::string getCurrentLine() const;

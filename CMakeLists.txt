@@ -16,6 +16,7 @@ set(SOURCES
     source/error/error.cpp
     source/parser/lexer.cpp
     source/parser/parser.cpp
+    source/parser/ast.cpp
 )
 
 include_directories(

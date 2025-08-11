@@ -2,115 +2,140 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <iostream>
 
-struct ASTNode {
-    virtual ~ASTNode() = default;
-    virtual void dump(int index = 0) const = 0;
+enum class VarType {
+    Int,
+    Float,
+    String,
+    Char,
+    Bool,
+    Void,
 };
 
-using ASTPtr = std::shared_ptr<ASTNode>;
+inline std::string toString(VarType t) {
+    switch (t) {
+        case VarType::Int: return "Int";
+        case VarType::Float: return "Float";
+        case VarType::String: return "String";
+        case VarType::Char: return "Char";
+        case VarType::Bool: return "Bool";
+        case VarType::Void: return "Void";
+        default: return "Unknown";
+    }
+}
+
+struct ASTNode {
+    int line = 0;
+    int column = 0;
+    virtual ~ASTNode() = default;
+    virtual void dump(int indent = 0) const = 0;
+};
+
+using ASTPtr = std::unique_ptr<ASTNode>;
 
 struct Expr : ASTNode {};
 
 struct IntExpr : Expr {
-    int value;
-    IntExpr(int v) : value(v) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Int(" << value << ")\n";
-    }
+    int64_t value;
+    explicit IntExpr(int64_t v);
+    void dump(int indent = 0) const override;
+};
+
+struct DoubleExpr : Expr {
+    double value;
+    explicit DoubleExpr(double v);
+    void dump(int indent = 0) const override;
 };
 
 struct StringExpr : Expr {
     std::string value;
-    StringExpr(std::string v) : value(std::move(v)) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "String(\"" << value << "\")\n";
-    }
+    explicit StringExpr(const std::string& v);
+    void dump(int indent = 0) const override;
+};
+
+struct CharExpr : Expr {
+    char value;
+    explicit CharExpr(char v);
+    void dump(int indent = 0) const override;
+};
+
+struct BoolExpr : Expr {
+    bool value;
+    explicit BoolExpr(bool v);
+    void dump(int indent = 0) const override;
+};
+
+struct VoidExpr : Expr {
+    VoidExpr();
+    void dump(int indent = 0) const override;
 };
 
 struct VarExpr : Expr {
     std::string name;
-    VarExpr(std::string n) : name(std::move(n)) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Var(" << name << ")\n";
-    }
+    explicit VarExpr(const std::string& n);
+    void dump(int indent = 0) const override;
 };
 
 struct BinaryExpr : Expr {
     std::string op;
-    ASTPtr left, right;
-    BinaryExpr(std::string o, ASTPtr l, ASTPtr r) : op(std::move(o)), left(l), right(r) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Binary(" << op << ")\n";
-        left->dump(indent + 2);
-        right->dump(indent + 2);
-    }
+    ASTPtr left = nullptr;
+    ASTPtr right = nullptr;
+    BinaryExpr(const std::string& o, ASTPtr l, ASTPtr r);
+    void dump(int indent = 0) const override;
 };
 
 struct CallExpr : Expr {
     std::string callee;
     std::vector<ASTPtr> args;
-    CallExpr(std::string c, std::vector<ASTPtr> a) : callee(std::move(c)), args(std::move(a)) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Call(" << callee << ")\n";
-        for (auto &arg : args) arg->dump(indent + 2);
-    }
+    CallExpr(const std::string& c, std::vector<ASTPtr> a);
+    void dump(int indent = 0) const override;
 };
 
 struct Stmt : ASTNode {};
 
 struct ReturnStmt : Stmt {
     ASTPtr value;
-    ReturnStmt(ASTPtr v) : value(v) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Return\n";
-        value->dump(indent + 2);
-    }
+    explicit ReturnStmt(ASTPtr v);
+    void dump(int indent = 0) const override;
 };
 
 struct IfStmt : Stmt {
-    ASTPtr cond;
+    ASTPtr cond = nullptr;
     std::vector<ASTPtr> thenBranch;
     std::vector<ASTPtr> elseBranch;
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "If\n";
-        cond->dump(indent + 2);
-        std::cout << std::string(indent, ' ') << "Then:\n";
-        for (auto &s : thenBranch) s->dump(indent + 2);
-        if (!elseBranch.empty()) {
-            std::cout << std::string(indent, ' ') << "Else:\n";
-            for (auto &s : elseBranch) s->dump(indent + 2);
-        }
-    }
+    IfStmt(ASTPtr condition,
+           std::vector<ASTPtr> thenB,
+           std::vector<ASTPtr> elseB = {});
+    void dump(int indent = 0) const override;
 };
 
-struct VarDecl : Stmt {
-    std::string name, type;
-    ASTPtr init;
-    VarDecl(std::string n, std::string t, ASTPtr i) : name(std::move(n)), type(std::move(t)), init(i) {}
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "VarDecl(" << name << ": " << type << ")\n";
-        if (init) init->dump(indent + 2);
-    }
+struct LetDecl : Stmt {
+    std::string name;
+    VarType type;
+    ASTPtr init = nullptr;
+    LetDecl(const std::string& n, VarType t, ASTPtr i);
+    void dump(int indent = 0) const override;
+};
+
+struct BlockStmt : Stmt {
+    std::vector<ASTPtr> statements;
+    explicit BlockStmt(std::vector<ASTPtr> stmts);
+    void dump(int indent = 0) const override;
 };
 
 struct Function : Stmt {
-    std::string name, returnType;
-    std::vector<std::pair<std::string, std::string>> params;
-    std::vector<ASTPtr> body;
-    void dump(int indent = 0) const override {
-        std::cout << std::string(indent, ' ') << "Function " << name << " -> " << returnType << "\n";
-        for (auto &p : params)
-            std::cout << std::string(indent + 2, ' ') << "Param: " << p.first << ": " << p.second << "\n";
-        for (auto &s : body) s->dump(indent + 2);
-    }
+    std::string name;
+    VarType returnType;
+    std::vector<std::pair<std::string, VarType>> params;
+    std::unique_ptr<BlockStmt> body;
+    Function(const std::string& n,
+             VarType rt,
+             std::vector<std::pair<std::string, VarType>> p,
+             std::unique_ptr<BlockStmt> b);
+    void dump(int indent = 0) const override;
 };
 
 struct Program : ASTNode {
-    std::vector<ASTPtr> functions;
-    void dump(int indent = 0) const override {
-        std::cout << "Program\n";
-        for (auto &f : functions) f->dump(indent + 2);
-    }
+    std::vector<std::unique_ptr<Function>> functions;
+    void dump(int indent = 0) const override;
 };

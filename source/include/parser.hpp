@@ -8,7 +8,7 @@ public:
         advance();
     }
 
-    std::shared_ptr<Program> parseProgram();
+    std::unique_ptr<Program> parseProgram();
 
 private:
     Lexer &lexer;
@@ -18,10 +18,11 @@ private:
     bool check(TokenType type) const;
     bool match(TokenType type);
     void expect(TokenType type, const std::string &msg);
+    bool isTypeToken(TokenType t) const;
 
     ASTPtr parseFunction();
     ASTPtr parseStatement();
-    ASTPtr parseVarDecl();
+    ASTPtr parseLetDecl();
     ASTPtr parseIfStmt();
     ASTPtr parseReturnStmt();
     ASTPtr parseExpression();

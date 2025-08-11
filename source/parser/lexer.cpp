@@ -66,8 +66,19 @@ Token Lexer::identifierOrKeyword() {
     static const std::unordered_map<std::string, TokenType> keywords = {
         {"fn", TokenType::Fn}, {"let", TokenType::Let},
         {"if", TokenType::If}, {"else", TokenType::Else},
-        {"return", TokenType::Return}
+        {"return", TokenType::Return}, {"print", TokenType::Print},
+
+        {"Int", TokenType::IntType},
+        {"Float", TokenType::FloatType},
+        {"String", TokenType::StringType},
+        {"Char", TokenType::CharType},
+        {"Bool", TokenType::BoolType},
+        {"Void", TokenType::VoidType},
+
+        {"true", TokenType::Bool},
+        {"false", TokenType::Bool},
     };
+
 
     auto it = keywords.find(text);
     if (it != keywords.end())
@@ -93,7 +104,10 @@ Token Lexer::number() {
 
 Token Lexer::string() {
     int startCol = col, startLine = line;
+    size_t startPos = pos - 1;
+
     advance();
+
     std::string value;
     while (true) {
         char c = advance();
@@ -112,7 +126,36 @@ Token Lexer::string() {
             value.push_back(c);
         }
     }
-    return {TokenType::String, value, startLine, startCol};
+
+    size_t endPos = pos;
+    std::string lexeme = source.substr(startPos, endPos - startPos);
+
+    return {TokenType::String, lexeme, startLine, startCol};
+}
+
+Token Lexer::_char() {
+    int startCol = col, startLine = line;
+    char c = advance();
+    if (c == '\0') throw error("Unterminated char literal");
+
+    char value;
+
+    if (c == '\\') {
+        char e = advance();
+        switch (e) {
+            case 'n': value = '\n'; break;
+            case 't': value = '\t'; break;
+            case '\\': value = '\\'; break;
+            case '\'': value = '\''; break;
+            default: throw error("Invalid escape sequence in char literal");
+        }
+    } else {
+        value = c;
+    }
+    if (!match('\'')) {
+        throw error("Unterminated char literal, missing closing '");
+    }
+    return {TokenType::Char, std::string(1, value), startLine, startCol};
 }
 
 Token Lexer::nextToken() {
@@ -159,6 +202,7 @@ Token Lexer::nextToken() {
             return {TokenType::Greater, ">", startLine, startCol};
 
         case '"': return string();
+        case '\'': return _char();
     }
 
     if (std::isalpha(c) || c == '_') {

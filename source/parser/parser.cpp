@@ -1,6 +1,30 @@
 #include "parser.hpp"
 #include <stdexcept>
 
+static VarType stringToVarType(const std::string& s) {
+    if (s == "Int") return VarType::Int;
+    if (s == "Float") return VarType::Float;
+    if (s == "String") return VarType::String;
+    if (s == "Char") return VarType::Char;
+    if (s == "Bool") return VarType::Bool;
+    if (s == "Void") return VarType::Void;
+    throw std::runtime_error("Unknown type: " + s);
+}
+
+bool Parser::isTypeToken(TokenType t) const {
+    switch (t) {
+        case TokenType::IntType:
+        case TokenType::FloatType:
+        case TokenType::CharType:
+        case TokenType::BoolType:
+        case TokenType::StringType:
+        case TokenType::VoidType:
+            return true;
+        default:
+            return false;
+    }
+}
+
 void Parser::advance() {
     current = lexer.nextToken();
 }
@@ -21,10 +45,10 @@ void Parser::expect(TokenType type, const std::string &msg) {
     if (!match(type)) throw std::runtime_error("Expected " + msg);
 }
 
-std::shared_ptr<Program> Parser::parseProgram() {
-    auto prog = std::make_shared<Program>();
+std::unique_ptr<Program> Parser::parseProgram() {
+    auto prog = std::make_unique<Program>();
     while (!check(TokenType::Eof)) {
-        prog->functions.push_back(parseFunction());
+        prog->functions.push_back(std::unique_ptr<Function>(static_cast<Function*>(parseFunction().release())));
     }
     return prog;
 }
@@ -36,32 +60,29 @@ ASTPtr Parser::parseFunction() {
     advance();
 
     expect(TokenType::LParen, "`(`");
-    std::vector<std::pair<std::string, std::string>> params;
+    std::vector<std::pair<std::string, VarType>> params;
     if (!check(TokenType::RParen)) {
         do {
             if (!check(TokenType::Identifier)) throw std::runtime_error("Expected parameter name");
             std::string pname = current.lexeme;
             advance();
             expect(TokenType::Colon, "`:`");
-            if (!check(TokenType::Identifier)) throw std::runtime_error("Expected parameter type");
-            std::string ptype = current.lexeme;
+            if (!isTypeToken(current.type)) throw std::runtime_error("Expected parameter type");
+            VarType ptype = stringToVarType(current.lexeme);
             advance();
             params.push_back({pname, ptype});
         } while (match(TokenType::Comma));
     }
     expect(TokenType::RParen, "`)`");
     expect(TokenType::Arrow, "`->`");
-    if (!check(TokenType::Identifier)) throw std::runtime_error("Expected return type");
-    std::string returnType = current.lexeme;
+    if (!isTypeToken(current.type)) throw std::runtime_error("Expected return type");
+    VarType returnType = stringToVarType(current.lexeme);
     advance();
 
-    auto body = parseBlock();
+    auto stmts = parseBlock();
+    auto body = std::make_unique<BlockStmt>(std::move(stmts));
 
-    auto fn = std::make_shared<Function>();
-    fn->name = name;
-    fn->returnType = returnType;
-    fn->params = params;
-    fn->body = std::move(body);
+    auto fn = std::make_unique<Function>(name, returnType, std::move(params), std::move(body));
     return fn;
 }
 
@@ -78,7 +99,7 @@ std::vector<ASTPtr> Parser::parseBlock() {
 ASTPtr Parser::parseStatement() {
     ASTPtr stmt;
 
-    if (match(TokenType::Let)) stmt = parseVarDecl();
+    if (match(TokenType::Let)) stmt = parseLetDecl();
     else if (match(TokenType::If)) stmt = parseIfStmt();
     else if (match(TokenType::Return)) stmt = parseReturnStmt();
     else stmt = parseExpression();
@@ -89,19 +110,19 @@ ASTPtr Parser::parseStatement() {
     return stmt;
 }
 
-ASTPtr Parser::parseVarDecl() {
+ASTPtr Parser::parseLetDecl() {
     if (!check(TokenType::Identifier)) throw std::runtime_error("Expected variable name");
     std::string name = current.lexeme;
     advance();
     expect(TokenType::Colon, "`:`");
-    if (!check(TokenType::Identifier)) throw std::runtime_error("Expected type name");
-    std::string type = current.lexeme;
+    if (!isTypeToken(current.type)) throw std::runtime_error("Expected type name");
+    VarType type = stringToVarType(current.lexeme);
     advance();
     ASTPtr init = nullptr;
     if (match(TokenType::Eq)) {
         init = parseExpression();
     }
-    return std::make_shared<VarDecl>(name, type, init);
+    return std::make_unique<LetDecl>(name, type, std::move(init));
 }
 
 ASTPtr Parser::parseIfStmt() {
@@ -111,16 +132,12 @@ ASTPtr Parser::parseIfStmt() {
     if (match(TokenType::Else)) {
         elseBranch = parseBlock();
     }
-    auto ifs = std::make_shared<IfStmt>();
-    ifs->cond = cond;
-    ifs->thenBranch = std::move(thenBranch);
-    ifs->elseBranch = std::move(elseBranch);
-    return ifs;
+    return std::make_unique<IfStmt>(std::move(cond), std::move(thenBranch), std::move(elseBranch));
 }
 
 ASTPtr Parser::parseReturnStmt() {
     auto value = parseExpression();
-    return std::make_shared<ReturnStmt>(value);
+    return std::make_unique<ReturnStmt>(std::move(value));
 }
 
 ASTPtr Parser::parseExpression() {
@@ -131,7 +148,7 @@ ASTPtr Parser::parseEquality() {
     auto expr = parseComparison();
     while (match(TokenType::Eq)) {
         auto right = parseComparison();
-        expr = std::make_shared<BinaryExpr>("=", expr, right);
+        expr = std::make_unique<BinaryExpr>("=", std::move(expr), std::move(right));
     }
     return expr;
 }
@@ -140,7 +157,7 @@ ASTPtr Parser::parseComparison() {
     auto expr = parseTerm();
     while (match(TokenType::Leq)) {
         auto right = parseTerm();
-        expr = std::make_shared<BinaryExpr>("<=", expr, right);
+        expr = std::make_unique<BinaryExpr>("<=", std::move(expr), std::move(right));
     }
     return expr;
 }
@@ -150,7 +167,7 @@ ASTPtr Parser::parseTerm() {
     while (match(TokenType::Plus) || match(TokenType::Minus)) {
         std::string op = current.lexeme;
         auto right = parseFactor();
-        expr = std::make_shared<BinaryExpr>(op, expr, right);
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
     }
     return expr;
 }
@@ -160,7 +177,7 @@ ASTPtr Parser::parseFactor() {
     while (match(TokenType::Star) || match(TokenType::Slash)) {
         std::string op = current.lexeme;
         auto right = parsePrimary();
-        expr = std::make_shared<BinaryExpr>(op, expr, right);
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
     }
     return expr;
 }
@@ -169,12 +186,29 @@ ASTPtr Parser::parsePrimary() {
     if (check(TokenType::Integer)) {
         std::string numText = current.lexeme;
         advance();
-        return std::make_shared<IntExpr>(std::stoi(numText));
+        return std::make_unique<IntExpr>(std::stoll(numText));
+    }
+    if (check(TokenType::Float)) {
+        std::string numText = current.lexeme;
+        advance();
+        return std::make_unique<DoubleExpr>(std::stof(numText));
     }
     if (check(TokenType::String)) {
         std::string strText = current.lexeme;
         advance();
-        return std::make_shared<StringExpr>(strText);
+        return std::make_unique<StringExpr>(strText);
+    }
+    if (check(TokenType::Char)) {
+        std::string charText = current.lexeme;
+        advance();
+        if (charText.empty()) 
+            throw std::runtime_error("Empty char literal");
+        return std::make_unique<CharExpr>(charText[0]);
+    }
+    if (check(TokenType::Bool)) {
+        bool val = (current.lexeme == "true");
+        advance();
+        return std::make_unique<BoolExpr>(val);
     }
     if (check(TokenType::Identifier)) {
         return parseCallOrVar();
@@ -184,6 +218,11 @@ ASTPtr Parser::parsePrimary() {
         expect(TokenType::RParen, "`)`");
         return expr;
     }
+    if (check(TokenType::VoidType)) {
+        advance();
+        return std::make_unique<VoidExpr>();
+    }
+
     throw std::runtime_error("Unexpected token in expression");
 }
 
@@ -198,7 +237,7 @@ ASTPtr Parser::parseCallOrVar() {
             } while (match(TokenType::Comma));
         }
         expect(TokenType::RParen, "`)`");
-        return std::make_shared<CallExpr>(name, args);
+        return std::make_unique<CallExpr>(name, std::move(args));
     }
-    return std::make_shared<VarExpr>(name);
+    return std::make_unique<VarExpr>(name);
 }

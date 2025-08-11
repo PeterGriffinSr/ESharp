@@ -1,4 +1,4 @@
-fn fact(n: int) -> int {
+fn fact(n: Int) -> Int {
     if n <= 1 {
         return 1;
     } else {
@@ -6,7 +6,7 @@ fn fact(n: int) -> int {
     }
 }
 
-fn main() -> void {
-    let num: int = 5;
-    let fact: int = fact(num);~
+fn main() -> Void {
+    let num: Int = 5;
+    let fact: Int = fact(num);
 }
