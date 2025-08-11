@@ -25,8 +25,6 @@ inline std::string toString(VarType t) {
 }
 
 struct ASTNode {
-    int line = 0;
-    int column = 0;
     virtual ~ASTNode() = default;
     virtual void dump(int indent = 0) const = 0;
 };

@@ -11,12 +11,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
-set(SOURCES
-    source/main.cpp
-    source/error/error.cpp
-    source/parser/lexer.cpp
-    source/parser/parser.cpp
-    source/parser/ast.cpp
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    source/*.cpp
 )
 
 include_directories(
@@ -27,9 +23,4 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    $<$<CONFIG:DEBUG>:DEBUG_BUILD>
-    $<$<CONFIG:RELEASE>:NDEBUG>
 )
