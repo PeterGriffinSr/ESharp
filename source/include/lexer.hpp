@@ -31,8 +31,8 @@ public:
 
 private:
     std::string source;
-    size_t pos = 0;
     size_t length;
+    size_t pos = 0;
     int line = 1;
     int col = 1;
 
